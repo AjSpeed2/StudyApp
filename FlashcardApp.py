@@ -30,12 +30,6 @@ class FlashcardApp(QMainWindow):
     self.sidebarLayout.setSpacing(0)
     self.sidebarLayout.setAlignment(Qt.AlignTop)
 
-    #button1 = QPushButton("Deck 1", self)
-    ##button1.clicked.connect(partial(self.setActiveDeck, 1))
-    #button2 = QPushButton("Deck 2", self)
-    #button2.clicked.connect(partial(self.setActiveDeck, 2))
-    #button3 = QPushButton("Deck 3", self)
-    #button3.clicked.connect(partial(self.setActiveDeck, 3))
     addDeck = QPushButton("Create Deck", self)
     
     
@@ -53,7 +47,7 @@ class FlashcardApp(QMainWindow):
     mainLayout.addWidget(sidebarWidget)
     
     self.studyButton = QPushButton("Click to study active deck")
-    self.studyButton.clicked.connect(partial(self.openDeck, self.activeDeckName))
+    self.studyButton.clicked.connect(partial(self.createPopup, StudyDeckPopup))
     self.studyButton.setMaximumSize(500, 200)
     # button for adding card to deck
     self.addCard = QPushButton("Click to add card to deck.")
@@ -70,14 +64,10 @@ class FlashcardApp(QMainWindow):
     
   
   def setActiveDeck(self, deckName):
-    print(deckName)
     self.activeDeckName = deckName
     self.activeDeckLabel.setText("Active Deck: " + self.activeDeckName)
     self.activeDeckLabel.update()
 
-
-  def openDeck(self, deckName):
-    print("Deck", self.activeDeckName)
   
   def createPopup(self, PopupClass):
     popup = PopupClass(self)
@@ -95,7 +85,91 @@ class FlashcardApp(QMainWindow):
     newDeck = Deck()
     # put it in deck container
     self.deckContainer[deckName] = newDeck
-    print(deckName)
+    self.setActiveDeck(deckName)
+
+  def addToDeck(self, front, back):
+    activeDeck = self.deckContainer[self.activeDeckName]
+    activeDeck.addCard(front, back)
+
+class StudyDeckPopup(QMainWindow):
+  def __init__(self, parent=None):
+    super(StudyDeckPopup, self).__init__(parent)
+    # set up
+    self.main = QWidget(self)
+    self.setCentralWidget(self.main)
+    # window title
+    self.setWindowTitle("Study Deck")
+
+    self.activeDeckName = window.activeDeckName
+    self.activeDeck = window.deckContainer[self.activeDeckName]
+    # front of card text
+    self.frontLabel = QLabel(self.activeDeck.head.front)
+    
+    # back of card text
+    self.backLabel = QLabel(self.activeDeck.head.back)
+
+    # next card buttoon
+    nextCardButon = QPushButton("Next Card")
+    nextCardButon.clicked.connect(self.nextCard)
+
+    # show card button
+    self.showButton = QPushButton("Show")
+    self.showButton.clicked.connect(self.showBack)
+    # create main layout
+    self.mainLayout = QVBoxLayout(self)
+    
+    # idk what this is for
+    parent = self.parentWidget()
+
+    # set geometry and move to middle
+    self.setGeometry(0, 0, 600, 300)
+    self.move(parent.geometry().center() - self.rect().center())
+    
+    # layout for the inputs so they are bundled
+    frontLayout = QHBoxLayout(self)
+    # make the input widget
+    self.frontWidget = QWidget(self)
+    # add the edit and button to layout
+    frontLayout.addWidget(self.frontLabel)
+
+    self.frontWidget.setLayout(frontLayout)
+    
+    # layout for the inputs so they are bundled
+    backLayout = QHBoxLayout(self)
+    # make the input widget
+    self.backWidget = QWidget(self)
+    # add the edit and button to layout
+    backLayout.addWidget(self.backLabel)
+    backLayout.addWidget(nextCardButon)
+
+    self.backWidget.setLayout(backLayout)
+    self.backWidget.hide()
+    # set the main layout
+    self.mainLayout.addWidget(self.frontWidget, alignment=Qt.AlignBottom)
+    self.mainLayout.addWidget(self.showButton, alignment=Qt.AlignTop)
+    self.main.setLayout(self.mainLayout)
+  
+  def showBack(self):
+    self.frontWidget.hide()
+    self.showButton.hide()
+    self.mainLayout.addWidget(self.backWidget, alignment=Qt.AlignTop)
+    self.backWidget.show()
+
+  def nextCard(self):
+    # set the active card to the next card in the deck
+    self.activeDeck.head = self.activeDeck.head.nextCard
+    # change labels
+    self.frontLabel.text = self.activeDeck.head.front
+    self.backLabel.text = self.activeDeck.head.back
+    # show and hide labels
+    self.backWidget.hide()
+    self.frontWidget.show()
+    self.showButton.show()
+
+
+
+    
+    
 
 class AddCardPopup(QMainWindow):
   def __init__(self, parent=None):
@@ -119,7 +193,7 @@ class AddCardPopup(QMainWindow):
 
     # confirm button
     okay = QPushButton("Okay")
-    okay.clicked.connect(self.setDeckName)
+    okay.clicked.connect(self.confirmCard)
     # create main layout
     mainLayout = QVBoxLayout(self)
     
@@ -155,11 +229,12 @@ class AddCardPopup(QMainWindow):
     mainLayout.addWidget(okay, alignment=Qt.AlignTop)
     self.main.setLayout(mainLayout)
 
-  def setDeckName (self):
+  def confirmCard (self):
     # gets the text in the input field
-    deckName = self.edit.text()
+    front = self.frontEdit.text()
+    back = self.backEdit.text()
     # call createDeck
-    window.createDeck(deckName)
+    window.addToDeck(front, back)
     # close window
     self.close()
 
@@ -218,10 +293,12 @@ class Deck:
     self.head = None
     self.id = None
 
-  def addCard(self, question, answer):
-    newCard = FlashCard(question, answer)
+  def addCard(self, front, back):
+    newCard = FlashCard(front, back)
     newCard.nextCard = self.head
     self.head = newCard
+    print(self)
+
 
   def __repr__(self):
     cards = []
@@ -229,23 +306,23 @@ class Deck:
 
     while current:
       if current is self.head:
-        cards.append("[Head: %s]" % current.question)
+        cards.append("[Head: F = %s, B = %s]" % (current.front, current.back))
       elif current.nextCard is None:
-        cards.append("[Tail: %s]" % current.question)
+        cards.append("[Tail: F = %s, B = %s]" % (current.front, current.back))
       else:
-        cards.append("[%s]" % current.question)
+        cards.append("[F = %s, B = %s]" % (current.front, current.back))
 
       current = current.nextCard
     return '->'.join(cards)
 
 
 class FlashCard:
-  question = None
-  answer = None
+  front = None
+  back = None
   nextCard = None
-  def __init__(self, question, answer):
-    self.question = question
-    self.answer = answer
+  def __init__(self, front, back):
+    self.front = front
+    self.back = back
   
   
   
