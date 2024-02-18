@@ -1,10 +1,11 @@
 import sys
-from typing import Optional
+from random import shuffle
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import *
 from PySide6.QtCharts import *
 from PySide6.QtWidgets import QWidget
 from functools import partial
+from PySide6.QtGui import *
 
 
 class FlashcardApp(QMainWindow):
@@ -52,17 +53,24 @@ class FlashcardApp(QMainWindow):
     # button for adding card to deck
     self.addCard = QPushButton("Click to add card to deck.")
     self.addCard.clicked.connect(partial(self.createPopup, AddCardPopup))
+    self.removeCard = QPushButton("Click to remove card")
+    self.removeCard.clicked.connect(partial(self.createPopup, EditDeckPopup))
     
     mainLayout.addWidget(self.studyButton)
-    mainLayout.addWidget(self.addCard)
+    cardWidgit = QWidget()
+    cardLayout = QVBoxLayout()
+    cardWidgit.setLayout(cardLayout)
+    cardLayout.addWidget(self.addCard)
+    cardLayout.addWidget(self.removeCard)
+    mainLayout.addWidget(cardWidgit)
 
     self.activeDeckLabel = QLabel("Active Deck: " + self.activeDeckName)
     mainLayout.addWidget(self.activeDeckLabel)
     
     self.setWindowTitle("Flashcard App")
-    self.setGeometry(500, 500, 1080, 720)
     
-  
+    self.show()
+
   def setActiveDeck(self, deckName):
     self.activeDeckName = deckName
     self.activeDeckLabel.setText("Active Deck: " + self.activeDeckName)
@@ -72,6 +80,7 @@ class FlashcardApp(QMainWindow):
   def createPopup(self, PopupClass):
     popup = PopupClass(self)
     popup.show()
+
   
   def createDeck(self, deckName):
     # creates the new button on the sidebar
@@ -79,6 +88,7 @@ class FlashcardApp(QMainWindow):
     self.sidebarCount+=1
     # connect the button to the set active deck function
     newDeckButton.clicked.connect(partial(self.setActiveDeck, deckName))
+    newDeckButton.customContextMenuRequested.connect(self.editDeckButton)
     # add the widget to the sidebar
     self.sidebarLayout.addWidget(newDeckButton, alignment=Qt.AlignTop)
     # create the new deck
@@ -90,23 +100,36 @@ class FlashcardApp(QMainWindow):
   def addToDeck(self, front, back):
     activeDeck = self.deckContainer[self.activeDeckName]
     activeDeck.addCard(front, back)
+  
+  def editDeckButton(self):
+    print("test")
 
 class StudyDeckPopup(QMainWindow):
+  
   def __init__(self, parent=None):
     super(StudyDeckPopup, self).__init__(parent)
+    
+
     # set up
+    
     self.main = QWidget(self)
     self.setCentralWidget(self.main)
     # window title
     self.setWindowTitle("Study Deck")
 
     self.activeDeckName = window.activeDeckName
-    self.activeDeck = window.deckContainer[self.activeDeckName]
+    
+    self.activeDeck = window.deckContainer[self.activeDeckName].getCards()
+    self.ogDeck = self.activeDeck.copy()
+    shuffle(self.activeDeck)
+    
+    self.cardCounter = 0
+    self.activeCard = self.activeDeck[self.cardCounter]
     # front of card text
-    self.frontLabel = QLabel(self.activeDeck.head.front)
+    self.frontLabel = QLabel(self.activeCard["front"])
     
     # back of card text
-    self.backLabel = QLabel(self.activeDeck.head.back)
+    self.backLabel = QLabel(self.activeCard["back"])
 
     # next card buttoon
     nextCardButon = QPushButton("Next Card")
@@ -144,31 +167,172 @@ class StudyDeckPopup(QMainWindow):
 
     self.backWidget.setLayout(backLayout)
     self.backWidget.hide()
+
+    self.endWidget = QWidget();
+    endLayout = QVBoxLayout()
+
+    endOfDeckLabel = QLabel("You have reached the end of this deck.")
+    endLayout.addWidget(endOfDeckLabel)
+    
+
+    studyAgainButton = QPushButton("Study Again")
+    studyAgainButton.clicked.connect(self.studyAgainReset)
+    endLayout.addWidget(studyAgainButton)
+    
+
+    closeButton = QPushButton("Close")
+    closeButton.clicked.connect(self.close)
+    endLayout.addWidget(closeButton)
+    
+
+    
+    
+    self.endWidget.setLayout(endLayout)
+    self.endWidget.hide()
+
     # set the main layout
     self.mainLayout.addWidget(self.frontWidget, alignment=Qt.AlignBottom)
     self.mainLayout.addWidget(self.showButton, alignment=Qt.AlignTop)
+    self.mainLayout.addWidget(self.backWidget)
+    
+    self.mainLayout.addWidget(self.endWidget)
     self.main.setLayout(self.mainLayout)
+    #self.resetCards()
+
+    print(self.cardCounter)
+    print(self.activeCard)
   
   def showBack(self):
+
     self.frontWidget.hide()
     self.showButton.hide()
-    self.mainLayout.addWidget(self.backWidget, alignment=Qt.AlignTop)
+    self.mainLayout.addWidget(self.backWidget, alignment=Qt.AlignBottom)
     self.backWidget.show()
 
   def nextCard(self):
+    self.cardCounter += 1
+    if self.cardCounter >= len(self.activeDeck):
+      self.endOfDeck()
+      return None
+      
+    
     # set the active card to the next card in the deck
-    self.activeDeck.head = self.activeDeck.head.nextCard
+    self.activeCard = self.activeDeck[self.cardCounter]
+    
     # change labels
-    self.frontLabel.text = self.activeDeck.head.front
-    self.backLabel.text = self.activeDeck.head.back
+    self.frontLabel.setText(self.activeCard["front"])
+    self.backLabel.setText(self.activeCard["back"])
     # show and hide labels
     self.backWidget.hide()
     self.frontWidget.show()
     self.showButton.show()
 
+  def endOfDeck(self):
+    """Shows that the user has reached the end of the deck."""
+    self.backWidget.hide()
+    self.endWidget.show()
 
+  def studyAgainReset(self):
+    """Resets the study window back to the start and randomizes the cards."""
+    shuffle(self.activeDeck)
+    self.cardCounter = 0
+    self.endWidget.hide()
+    self.frontWidget.show()
+    self.showButton.show()
+
+
+  def resetCards(self):
+    for card in self.activeDeck.getCards():
+      card["active"] = False
+    print(self.activeDeck.getCards())
+
+class EditDeckPopup(QMainWindow):
+  def __init__(self, parent=None):
+    super(EditDeckPopup, self).__init__(parent)
+    # set up
+    self.main = QWidget(self)
+    self.setCentralWidget(self.main)
+    # window title
+    self.setWindowTitle("Edit Deck")
+
+    self.activeDeckName = window.activeDeckName
+    self.activeDeck = window.deckContainer[self.activeDeckName].getCards()
+
+    deckLabel = QLabel(self.activeDeckName)
+
+    self.mainTable = QTableWidget()
+    self.mainTable.setRowCount(len(self.activeDeck))
+    self.mainTable.setColumnCount(2)
+    self.mainTable.setHorizontalHeaderLabels(["Front", "Back"])
+    
+    closeButton = QPushButton("Close")
+    closeButton.clicked.connect(self.close)
+
+    # table widget
+    self.initializeTable()
+
+    layout = QVBoxLayout()
+    layout.addWidget(deckLabel)
+    layout.addWidget(self.mainTable)
+    layout.addWidget(closeButton)
+
+    self.main.setLayout(layout)
+    
+    self.mainTable.itemChanged.connect(self.confirm)
+    
+    
+
+  def initializeTable(self):
+    """Fills information from the current deck."""
+    count = 0
+    for card in self.activeDeck:
+      
+
+      front = QTableWidgetItem(card["front"])
+      back = QTableWidgetItem(card["back"])
+
+      if count % 2:
+        front.setBackground(QColor(225, 225, 225))
+        back.setBackground(QColor(225, 225, 225))
+
+      
+      
+
+      self.mainTable.setItem(count, 0, front)
+      self.mainTable.setItem(count, 1, back)
+
+      count += 1;
 
     
+    
+
+    width = self.mainTable.horizontalHeader().length() + self.mainTable.verticalHeader().length() + 5
+    height = self.mainTable.verticalHeader().length() + self.mainTable.horizontalHeader().height() + 5
+    self.resize(width, height)
+
+
+    self.mainTable.resizeColumnsToContents()
+    self.mainTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+    self.mainTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+
+    geometry = self.screen().geometry()
+    self.setMaximumWidth(geometry.width())
+    
+    
+    
+
+    self.mainTable.show()
+
+  def confirm(self, item):
+    """Saves the changes made to the cards."""
+    face = "front" if item.column() == 0 else "back"
+
+    self.activeDeck[item.row()][face] = item.text()
+
+    
+
+
+
     
 
 class AddCardPopup(QMainWindow):
@@ -287,54 +451,28 @@ class NameDeckPopup(QMainWindow):
     self.close()
 
 class Deck:
-  deckID = None
   deckName = None
+  cards = None
   def __init__(self):
-    self.head = None
-    self.id = None
+    self.cards = []
+
+  def getCards(self):
+    return self.cards
 
   def addCard(self, front, back):
-    newCard = FlashCard(front, back)
-    newCard.nextCard = self.head
-    self.head = newCard
-    print(self)
+    self.cards.append({"front": front, "back": back, "active": False})
 
 
-  def __repr__(self):
-    cards = []
-    current = self.head
-
-    while current:
-      if current is self.head:
-        cards.append("[Head: F = %s, B = %s]" % (current.front, current.back))
-      elif current.nextCard is None:
-        cards.append("[Tail: F = %s, B = %s]" % (current.front, current.back))
-      else:
-        cards.append("[F = %s, B = %s]" % (current.front, current.back))
-
-      current = current.nextCard
-    return '->'.join(cards)
+  
 
 
 class FlashCard:
   front = None
   back = None
-  nextCard = None
   def __init__(self, front, back):
     self.front = front
     self.back = back
   
-  
-  
-class SaveFile:
-  def __init__(self):
-    print("test")
-
-    
-
-class LoadFile:
-  def __init__(self):
-    print("test")
 
 
 
