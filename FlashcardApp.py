@@ -53,16 +53,9 @@ class FlashcardApp(QMainWindow):
     # button for adding card to deck
     self.addCard = QPushButton("Click to add card to deck.")
     self.addCard.clicked.connect(partial(self.createPopup, AddCardPopup))
-    self.removeCard = QPushButton("Click to remove card")
-    self.removeCard.clicked.connect(partial(self.createPopup, EditDeckPopup))
     
     mainLayout.addWidget(self.studyButton)
-    cardWidgit = QWidget()
-    cardLayout = QVBoxLayout()
-    cardWidgit.setLayout(cardLayout)
-    cardLayout.addWidget(self.addCard)
-    cardLayout.addWidget(self.removeCard)
-    mainLayout.addWidget(cardWidgit)
+    mainLayout.addWidget(self.addCard)
 
     self.activeDeckLabel = QLabel("Active Deck: " + self.activeDeckName)
     mainLayout.addWidget(self.activeDeckLabel)
@@ -227,112 +220,9 @@ class StudyDeckPopup(QMainWindow):
     self.frontWidget.show()
     self.showButton.show()
 
-  def endOfDeck(self):
-    """Shows that the user has reached the end of the deck."""
-    self.backWidget.hide()
-    self.endWidget.show()
 
-  def studyAgainReset(self):
-    """Resets the study window back to the start and randomizes the cards."""
-    shuffle(self.activeDeck)
-    self.cardCounter = 0
-    self.endWidget.hide()
-    self.frontWidget.show()
-    self.showButton.show()
-
-
-  def resetCards(self):
-    for card in self.activeDeck.getCards():
-      card["active"] = False
-    print(self.activeDeck.getCards())
-
-class EditDeckPopup(QMainWindow):
-  def __init__(self, parent=None):
-    super(EditDeckPopup, self).__init__(parent)
-    # set up
-    self.main = QWidget(self)
-    self.setCentralWidget(self.main)
-    # window title
-    self.setWindowTitle("Edit Deck")
-
-    self.activeDeckName = window.activeDeckName
-    self.activeDeck = window.deckContainer[self.activeDeckName].getCards()
-
-    deckLabel = QLabel(self.activeDeckName)
-
-    self.mainTable = QTableWidget()
-    self.mainTable.setRowCount(len(self.activeDeck))
-    self.mainTable.setColumnCount(2)
-    self.mainTable.setHorizontalHeaderLabels(["Front", "Back"])
-    
-    closeButton = QPushButton("Close")
-    closeButton.clicked.connect(self.close)
-
-    # table widget
-    self.initializeTable()
-
-    layout = QVBoxLayout()
-    layout.addWidget(deckLabel)
-    layout.addWidget(self.mainTable)
-    layout.addWidget(closeButton)
-
-    self.main.setLayout(layout)
-    
-    self.mainTable.itemChanged.connect(self.confirm)
-    
-    
-
-  def initializeTable(self):
-    """Fills information from the current deck."""
-    count = 0
-    for card in self.activeDeck:
-      
-
-      front = QTableWidgetItem(card["front"])
-      back = QTableWidgetItem(card["back"])
-
-      if count % 2:
-        front.setBackground(QColor(225, 225, 225))
-        back.setBackground(QColor(225, 225, 225))
-
-      
-      
-
-      self.mainTable.setItem(count, 0, front)
-      self.mainTable.setItem(count, 1, back)
-
-      count += 1;
 
     
-    
-
-    width = self.mainTable.horizontalHeader().length() + self.mainTable.verticalHeader().length() + 5
-    height = self.mainTable.verticalHeader().length() + self.mainTable.horizontalHeader().height() + 5
-    self.resize(width, height)
-
-
-    self.mainTable.resizeColumnsToContents()
-    self.mainTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-    self.mainTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-
-    geometry = self.screen().geometry()
-    self.setMaximumWidth(geometry.width())
-    
-    
-    
-
-    self.mainTable.show()
-
-  def confirm(self, item):
-    """Saves the changes made to the cards."""
-    face = "front" if item.column() == 0 else "back"
-
-    self.activeDeck[item.row()][face] = item.text()
-
-    
-
-
-
     
 
 class AddCardPopup(QMainWindow):
