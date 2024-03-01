@@ -5,7 +5,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtCharts import *
 from PySide6.QtWidgets import QWidget
 from functools import partial
-
+from FlashcardApp import Deck
 
 
 settings = QSettings("AjSpeed Dev", "FlashcardApp")
@@ -13,3 +13,5 @@ settings.setValue("editor/wrapMargin", 68)
 
 margin = settings.value("editor/wrapMargin", 80)
 print(margin)
+
+wwoww = Deck()

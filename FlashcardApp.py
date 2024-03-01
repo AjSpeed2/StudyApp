@@ -1,6 +1,6 @@
 import sys
 from random import shuffle
-from PySide6.QtCore import Qt
+from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from PySide6.QtCharts import *
 from PySide6.QtWidgets import QWidget
@@ -203,7 +203,7 @@ class StudyDeckPopup(QMainWindow):
     print(self.activeCard)
   
   def showBack(self):
-
+    """Shows the backside of the card."""
     self.frontWidget.hide()
     self.showButton.hide()
     self.mainLayout.addWidget(self.backWidget, alignment=Qt.AlignBottom)
@@ -214,8 +214,7 @@ class StudyDeckPopup(QMainWindow):
     if self.cardCounter >= len(self.activeDeck):
       self.endOfDeck()
       return None
-      
-    
+
     # set the active card to the next card in the deck
     self.activeCard = self.activeDeck[self.cardCounter]
     
@@ -240,7 +239,6 @@ class StudyDeckPopup(QMainWindow):
     self.frontWidget.show()
     self.showButton.show()
 
-
   def resetCards(self):
     for card in self.activeDeck.getCards():
       card["active"] = False
@@ -252,76 +250,101 @@ class EditDeckPopup(QMainWindow):
     # set up
     self.main = QWidget(self)
     self.setCentralWidget(self.main)
-    # window title
-    self.setWindowTitle("Edit Deck")
+    
 
     self.activeDeckName = window.activeDeckName
     self.activeDeck = window.deckContainer[self.activeDeckName].getCards()
 
-    deckLabel = QLabel(self.activeDeckName)
+    # window title
+    self.setWindowTitle("Edit " + self.activeDeckName)
 
-    self.mainTable = QTableWidget()
-    self.mainTable.setRowCount(len(self.activeDeck))
-    self.mainTable.setColumnCount(2)
-    self.mainTable.setHorizontalHeaderLabels(["Front", "Back"])
+    deckLabel = QLabel("Active Deck: " + self.activeDeckName)
+
+    self.searchBar = QLineEdit()
+    self.searchBar.setPlaceholderText("Search Cards...")
+    self.searchBar.textChanged.connect(self.search)
+    
+
+    self.mainTable = QTableView()
+    self.model = QStandardItemModel(len(self.activeDeck), 2)
+
+    self.initializeTable()
+
+    self.proxyModel = QSortFilterProxyModel(self.mainTable)
+    self.proxyModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
+    self.proxyModel.filterAcceptsColumn(0)
+    self.proxyModel.setSourceModel(self.model)
+    self.mainTable.setModel(self.proxyModel)
+
+    #self.mainTable.setRowCount(len(self.activeDeck))
+    #self.mainTable.setColumnCount(3)
+    #self.mainTable.setHorizontalHeaderLabels(["Front", "Back", "Delete Card"])
     
     closeButton = QPushButton("Close")
     closeButton.clicked.connect(self.close)
 
     # table widget
-    self.initializeTable()
+    
 
     layout = QVBoxLayout()
     layout.addWidget(deckLabel)
+    layout.addWidget(self.searchBar)
     layout.addWidget(self.mainTable)
     layout.addWidget(closeButton)
 
     self.main.setLayout(layout)
     
-    self.mainTable.itemChanged.connect(self.confirm)
-    
-    
+    #self.mainTable.itemChanged.connect(self.confirm)
 
+    self.mainTable.show()
+
+
+    
+    
+    
+    
   def initializeTable(self):
     """Fills information from the current deck."""
+
+    
+
+
     count = 0
     for card in self.activeDeck:
       
-
-      front = QTableWidgetItem(card["front"])
-      back = QTableWidgetItem(card["back"])
-
-      if count % 2:
+      front = QStandardItem(card["front"])
+      back = QStandardItem(card["back"])
+      #delete = QPushButton("Delete")
+      #delete.clicked.connect(partial(window.deckContainer[self.activeDeckName].removeCard, count))
+      #delete.clicked.connect(partial(self.removeCard, count))
+      
+      if count % 2 == 1:
         front.setBackground(QColor(225, 225, 225))
         back.setBackground(QColor(225, 225, 225))
-
-      
-      
-
-      self.mainTable.setItem(count, 0, front)
-      self.mainTable.setItem(count, 1, back)
+ 
+      self.model.setItem(count, 0, front)
+      self.model.setItem(count, 1, back)
+      #self.mainTable.setCellWidget(count, 2, delete)
 
       count += 1;
 
     
-    
 
-    width = self.mainTable.horizontalHeader().length() + self.mainTable.verticalHeader().length() + 5
-    height = self.mainTable.verticalHeader().length() + self.mainTable.horizontalHeader().height() + 5
-    self.resize(width, height)
+    #width = self.mainTable.horizontalHeader().length() + self.mainTable.verticalHeader().length() + 5
+    #height = self.mainTable.verticalHeader().length() + self.mainTable.horizontalHeader().height() + 5
+    #self.resize(width, height)
 
 
-    self.mainTable.resizeColumnsToContents()
-    self.mainTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.str)
-    self.mainTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    #self.mainTable.resizeColumnsToContents()
+    #self.mainTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+    #self.mainTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
 
-    geometry = self.screen().geometry()
-    self.setMaximumWidth(geometry.width())
-    
+    #geometry = self.screen().geometry()
+    #self.setMaximumWidth(geometry.width())
     
     
 
-    self.mainTable.show()
+    
 
   def confirm(self, item):
     """Saves the changes made to the cards."""
@@ -329,11 +352,15 @@ class EditDeckPopup(QMainWindow):
 
     self.activeDeck[item.row()][face] = item.text()
 
+  def removeCard(self, index):
+    """Removes card from the table."""
+    self.mainTable.removeRow(index)
     
-
-
-
+  def search(self, string):
+    self.proxyModel.setFilterFixedString(string)
     
+        
+  
 
 class AddCardPopup(QMainWindow):
   def __init__(self, parent=None):
@@ -462,8 +489,8 @@ class Deck:
   def addCard(self, front, back):
     self.cards.append({"front": front, "back": back, "active": False})
 
-
-  
+  def removeCard(self, index):
+    self.cards.pop(index)
 
 
 class FlashCard:
@@ -473,8 +500,6 @@ class FlashCard:
     self.front = front
     self.back = back
   
-
-
 
 if __name__ == "__main__":
   app = QApplication(sys.argv)
